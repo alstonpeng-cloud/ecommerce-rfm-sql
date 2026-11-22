@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电商用户价值分层分析看板</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --ink: #1f2733;
+    --muted: #79839a;
+    --line: #e7ebf2;
+    --accent: #2f6fed;
+    --warn: #d9534f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  }
+  header {
+    background: #22283a; color: #fff; padding: 22px 32px;
+    display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px;
+  }
+  header h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: .5px; }
+  header .sub { color: #aab4c8; font-size: 12px; }
+  header .badge {
+    font-size: 11px; border: 1px solid #7c879e; color: #d7dce8;
+    padding: 5px 10px; border-radius: 20px;
+  }
+  main { max-width: 1440px; margin: 0 auto; padding: 24px 28px 40px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .kpi .label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .kpi .value { font-size: 27px; font-weight: 700; color: var(--accent); }
+  .kpi .hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; grid-column: span 6;
+  }
+  .card.wide { grid-column: span 12; }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card .note { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+  .chart { width: 100%; height: 320px; }
+  .chart.tall { height: 360px; }
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+  select {
+    padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: #fff; color: var(--ink); font-family: inherit; font-size: 12px;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; background: #fafbfe; }
+  tbody tr:hover { background: #f5f8ff; cursor: pointer; }
+  footer { text-align: center; color: var(--muted); font-size: 11px; padding: 10px 0 30px; }
+  code { background: #eef2fa; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+  @media (max-width: 900px) { .card { grid-column: span 12; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>电商用户价值分层分析看板</h1>
+    <div class="sub">RFM 五分位分层 · 人群画像 · 精准营销 ROI 敏感性 &nbsp;|&nbsp; 数据快照 <span id="snapshot"></span></div>
+  </div>
+  <div class="badge">合成数据 · 仅用于方法演示，非真实业务收益</div>
+</header>
+
+<main>
+  <div class="kpis">
+    <div class="kpi"><div class="label">有购买记录用户</div><div class="value" id="kpiUsers">—</div><div class="hint">来自三张流水表去重聚合</div></div>
+    <div class="kpi"><div class="label">有效消费额（元）</div><div class="value" id="kpiRevenue">—</div><div class="hint">明细逐单汇总，排除取消/退款</div></div>
+    <div class="kpi"><div class="label">重要价值客户收入占比</div><div class="value" id="kpiTop">—</div><div class="hint">高 R 高 F 高 M 人群</div></div>
+    <div class="kpi"><div class="label">分层数</div><div class="value" id="kpiSegments">—</div><div class="hint">互斥 CASE WHEN 八分类</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>各分层用户占比 vs 收入贡献</h2>
+      <div class="note">点击柱子可切换下方人群画像</div>
+      <div id="chartMix" class="chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>收入贡献结构</h2>
+      <div class="note">按分层累计消费额占比</div>
+      <div id="chartPie" class="chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>人群画像（R / F / M 相对水平）</h2>
+      <div class="toolbar">当前分层：<select id="segmentSelect"></select></div>
+      <div id="chartRadar" class="chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>ROI 敏感性：精准策略 vs 传统 RFM</h2>
+      <div class="note">四档转化率提升假设，验证结论是否稳健</div>
+      <div id="chartRoi" class="chart"></div>
+    </div>
+
+    <div class="card wide">
+      <h2>用户分布：最近购买距今天数 × 消费金额</h2>
+      <div class="note">每个点是一名用户，颜色代表所属分层；左侧为近期活跃、右侧为沉睡</div>
+      <div id="chartScatter" class="chart tall"></div>
+    </div>
+
+    <div class="card wide">
+      <h2>分层明细</h2>
+      <div class="note">点击任意行查看该人群画像</div>
+      <table id="segmentTable">
+        <thead><tr>
+          <th>分层</th><th>用户数</th><th>用户占比</th><th>平均最近购买(天)</th>
+          <th>平均频次</th><th>平均消费(元)</th><th>收入占比</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>数据源：<code>ecommerce-rfm-sql/output</code> · 用 <code>python dashboard/build_dashboard.py</code> 重建 · Apache ECharts（已本地化，离线可用）</footer>
+</main>
+
+<script src="vendor/echarts.min.js"></script>
+<script src="data.js"></script>
+<script>
+(function () {
+  const D = window.RFM_DATA;
+  if (!D) { document.body.innerHTML = '<p style="padding:40px">数据未加载，请先运行 python dashboard/build_dashboard.py</p>'; return; }
+
+  document.getElementById('snapshot').textContent = D.snapshot;
+  document.getElementById('kpiUsers').textContent = D.totalUsers.toLocaleString();
+  document.getElementById('kpiRevenue').textContent = Math.round(D.totalRevenue).toLocaleString();
+  const top = D.segments.find(s => s.name === '重要价值客户') || D.segments[0];
+  document.getElementById('kpiTop').textContent = top.pctRevenue + '%';
+  document.getElementById('kpiSegments').textContent = D.segments.length;
+
+  const palette = ['#2f6fed','#00a8a8','#f2a93b','#8b6ce0','#e05a8a','#4caf50','#90a4ae','#d9534f'];
+  const colorOf = name => {
+    const i = D.segments.findIndex(s => s.name === name);
+    return palette[i < 0 ? 0 : i % palette.length];
+  };
+  const money = n => '¥' + Number(n).toLocaleString('zh-CN', {maximumFractionDigits: 0});
+  const axisText = { color: '#79839a', fontSize: 11 };
+  const baseGrid = { left: 55, right: 55, top: 40, bottom: 70 };
+
+  const mix = echarts.init(document.getElementById('chartMix'));
+  const pie = echarts.init(document.getElementById('chartPie'));
+  const radar = echarts.init(document.getElementById('chartRadar'));
+  const roiChart = echarts.init(document.getElementById('chartRoi'));
+  const scatter = echarts.init(document.getElementById('chartScatter'));
+
+  const sel = document.getElementById('segmentSelect');
+  D.segments.forEach(s => {
+    const o = document.createElement('option'); o.value = s.name; o.textContent = s.name; sel.appendChild(o);
+  });
+
+  function renderRadar(name) {
+    const s = D.segments.find(x => x.name === name) || D.segments[0];
+    radar.setOption({
+      tooltip: {},
+      radar: {
+        center: ['50%','55%'], radius: '65%',
+        indicator: [
+          {name:'最近购买(R)', max:100}, {name:'购买频次(F)', max:100}, {name:'消费金额(M)', max:100}
+        ],
+        axisName: { color: '#445068', fontSize: 11 },
+        splitLine: { lineStyle: { color: '#e7ebf2' } },
+        splitArea: { areaStyle: { color: ['#fafbfe','#fff'] } },
+        axisLine: { lineStyle: { color: '#e7ebf2' } }
+      },
+      series: [{
+        type: 'radar', symbolSize: 6,
+        data: [{
+          value: [s.radar_r, s.radar_f, s.radar_m], name: s.name,
+          lineStyle: { color: colorOf(s.name), width: 2 },
+          itemStyle: { color: colorOf(s.name) },
+          areaStyle: { color: colorOf(s.name), opacity: 0.22 }
+        }]
+      }]
+    }, true);
+  }
+
+  mix.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { data: ['用户占比', '收入占比'], bottom: 0, textStyle: axisText },
+    grid: baseGrid,
+    xAxis: { type: 'category', data: D.segments.map(s => s.name),
+      axisLabel: { ...axisText, interval: 0, rotate: 30 } },
+    yAxis: [
+      { type: 'value', name: '%', axisLabel: axisText, splitLine: { lineStyle: { color: '#eef1f7' } } },
+      { type: 'value', name: '%', axisLabel: axisText, splitLine: { show: false } }
+    ],
+    series: [
+      { name: '用户占比', type: 'bar', data: D.segments.map(s => s.pctUsers),
+        itemStyle: { color: '#8fb4f7', borderRadius: [4,4,0,0] }, barMaxWidth: 26 },
+      { name: '收入占比', type: 'bar', yAxisIndex: 1, data: D.segments.map(s => s.pctRevenue),
+        itemStyle: { color: '#2f6fed', borderRadius: [4,4,0,0] }, barMaxWidth: 26 }
+    ]
+  });
+  mix.on('click', p => { sel.value = p.name; renderRadar(p.name); });
+
+  pie.setOption({
+    tooltip: { trigger: 'item', formatter: p => p.name + '<br/>' + money(p.value) + ' (' + p.percent + '%)' },
+    legend: { type: 'scroll', orient: 'vertical', right: 4, top: 20, textStyle: axisText },
+    series: [{
+      type: 'pie', radius: ['42%','68%'], center: ['34%','52%'],
+      avoidLabelOverlap: true,
+      itemStyle: { borderColor: '#fff', borderWidth: 2 },
+      label: { show: false },
+      emphasis: { label: { show: true, fontSize: 12, fontWeight: 'bold' } },
+      data: D.segments.map(s => ({ name: s.name, value: s.totalMonetary, itemStyle: { color: colorOf(s.name) } }))
+    }]
+  });
+  pie.on('click', p => { sel.value = p.name; renderRadar(p.name); });
+
+  roiChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['精准人群策略','传统高消费前20%'], bottom: 0, textStyle: axisText },
+    grid: { left: 55, right: 30, top: 30, bottom: 55 },
+    xAxis: { type: 'category', data: D.roi.map(r => (r.liftTrad*100).toFixed(0)+'% / '+(r.liftTarget*100).toFixed(0)+'%'),
+      name: '提升假设(传统/精准)', nameLocation:'middle', nameGap: 32, nameTextStyle: axisText,
+      axisLabel: axisText },
+    yAxis: { type: 'value', name: 'ROI %', axisLabel: axisText, splitLine: { lineStyle: { color: '#eef1f7' } } },
+    series: [
+      { name: '精准人群策略', type: 'bar', data: D.roi.map(r => r.targetRoi),
+        itemStyle: { color: '#2f6fed', borderRadius: [4,4,0,0] }, barMaxWidth: 30 },
+      { name: '传统高消费前20%', type: 'bar', data: D.roi.map(r => r.tradRoi),
+        itemStyle: { color: '#b9c6db', borderRadius: [4,4,0,0] }, barMaxWidth: 30 }
+    ]
+  });
+
+  const groups = {};
+  D.scatter.forEach(p => {
+    if (!groups[p.segment]) groups[p.segment] = [];
+    groups[p.segment].push([p.recency, p.monetary]);
+  });
+  scatter.setOption({
+    tooltip: { trigger: 'item', formatter: p => p.seriesName + '<br/>最近购买 ' + p.value[0] + ' 天前 · 消费 ' + money(p.value[1]) },
+    legend: { type: 'scroll', data: D.segments.map(s => s.name), top: 0, textStyle: axisText },
+    grid: { left: 70, right: 40, top: 45, bottom: 55 },
+    xAxis: { type: 'value', name: '最近购买距今天数', nameLocation: 'middle', nameGap: 30,
+      nameTextStyle: axisText, axisLabel: axisText, splitLine: { lineStyle: { color: '#eef1f7' } } },
+    yAxis: { type: 'value', name: '消费金额(元)', axisLabel: axisText, splitLine: { lineStyle: { color: '#eef1f7' } } },
+    series: D.segments.map(s => ({
+      name: s.name, type: 'scatter', data: groups[s.name] || [],
+      symbolSize: 5, itemStyle: { color: colorOf(s.name), opacity: 0.7 }
+    }))
+  });
+
+  const tbody = document.querySelector('#segmentTable tbody');
+  D.segments.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + s.name + '</td><td>' + s.users + '</td><td>' + s.pctUsers + '%</td>' +
+      '<td>' + s.avgRecency + '</td><td>' + s.avgFrequency + '</td><td>' + money(s.avgMonetary) +
+      '</td><td>' + s.pctRevenue + '%</td>';
+    tr.onclick = () => { sel.value = s.name; renderRadar(s.name); };
+    tbody.appendChild(tr);
+  });
+
+  sel.onchange = e => renderRadar(e.target.value);
+  renderRadar(D.segments[0].name);
+  window.addEventListener('resize', () => {
+    [mix, pie, radar, roiChart, scatter].forEach(c => c.resize());
+  });
+})();
+</script>
+</body>
+</html>

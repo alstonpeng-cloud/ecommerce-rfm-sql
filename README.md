@@ -43,11 +43,26 @@
 ## 运行方式
 
 ```bash
-python run.py                  # 生成库 + 执行 SQL + 导出结果
-python tests/test_pipeline.py  # 交叉校验（可选）
+python run.py                          # 生成库 + 执行 SQL + 导出结果
+python tests/test_pipeline.py          # 交叉校验（可选）
+python dashboard/build_dashboard.py    # 用结果数据重建看板 data.js（可选）
 ```
 
 无需 `pip install`：只使用 Python 标准库（3.9+）。产物在 `rfm.sqlite` 与 `output/`。
+
+## 可视化看板（自学 BI 工具练习）
+
+基于项目真实输出，用 **Apache ECharts** 做了一个交互式看板（自学可视化工具后的练习），双击 `dashboard/index.html` 即可离线打开，无需服务器：
+
+- **KPI 卡片**：有购买用户数、有效消费额、重要价值客户收入占比、分层数；
+- **分层对比**：各分层用户占比 vs 收入贡献双柱图，点击柱子切换人群画像；
+- **收入结构**：环形图展示收入贡献；
+- **人群画像**：R/F/M 雷达图，可下拉或点击柱子/表格切换分层；
+- **ROI 敏感性**：精准策略 vs 传统 RFM 的四档对比柱状图；
+- **用户分布**：最近购买天数 × 消费金额的散点图，按分层着色；
+- **分层明细表**：点击行联动画像。
+
+图表库已本地化到 `dashboard/vendor/`，数据由 `build_dashboard.py` 从 `output/*.csv` 生成，完全离线可复现。
 
 ## 结果摘要（来自实际运行）
 
@@ -67,6 +82,11 @@ ecommerce-rfm-sql/
 ├── sql/02_campaign_roi.sql        # 4 档 ROI 敏感性网格
 ├── run.py                         # 一键运行
 ├── tests/test_pipeline.py         # 独立复算交叉校验
+├── dashboard/
+│   ├── index.html                 # 交互式 BI 看板（离线可打开）
+│   ├── data.js                    # 由 build_dashboard.py 生成
+│   ├── build_dashboard.py         # 从 output CSV 重建看板数据
+│   └── vendor/echarts.min.js      # 本地化图表库
 └── output/                        # 运行后生成的结果 CSV
 ```
 
